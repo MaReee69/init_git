@@ -1,0 +1,15 @@
+create index idx_likes_to_profile on likes (to_profile_id);
+create index idx_likes_from_profile on likes (from_profile_id);
+create index idx_matches_profile_a on matches (profile_id_a);
+create index idx_matches_profile_b on matches (profile_id_b);
+create index idx_messages_match_created on messages (match_id, created_at);
+create index idx_blocks_blocker on blocks (blocker_id);
+create index idx_blocks_blocked on blocks (blocked_id);
+create index idx_recommendation_events_profile on recommendation_events (profile_id, created_at desc);
+create index idx_match_score_cache_profile on match_score_cache (profile_id);
+create index idx_availability_slots_profile on availability_slots (profile_id);
+create index idx_profile_interests_interest on profile_interests (interest_id);
+create index idx_reports_reported on reports (reported_id);
+create index idx_date_proposals_match on date_proposals (match_id);
+create index idx_date_feedback_match on date_feedback (match_id);
+create index idx_voice_turns_session on voice_turns (session_id, created_at);
