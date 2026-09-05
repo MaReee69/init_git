@@ -44,6 +44,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <TabIcon symbol="◇" color={color} />,
         }}
       />
+      <Tabs.Screen name="candidate/[profileId]" options={{ href: null }} />
     </Tabs>
   );
 }

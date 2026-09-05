@@ -1,4 +1,4 @@
-import type { AvailabilitySlot, DatingPreferences, Interest, Profile } from '@/types/domain';
+import type { AvailabilitySlot, DatingPreferences, Interest, Match, Profile, ProfileAnswer } from '@/types/domain';
 
 // Supabaseの行(snake_case)とドメイン型(camelCase)を変換する。
 
@@ -68,5 +68,25 @@ export function rowToInterest(row: Record<string, unknown>): Interest {
     key: row.key as string,
     labelJa: row.label_ja as string,
     category: (row.category as string) ?? undefined,
+  };
+}
+
+export function rowToMatch(row: Record<string, unknown>): Match {
+  return {
+    id: row.id as string,
+    profileIdA: row.profile_id_a as string,
+    profileIdB: row.profile_id_b as string,
+    matchedAt: row.matched_at as string,
+    status: (row.status as Match['status']) ?? 'active',
+  };
+}
+
+export function rowToProfileAnswer(row: Record<string, unknown>): ProfileAnswer {
+  return {
+    id: row.id as string,
+    profileId: row.profile_id as string,
+    questionKey: row.question_key as string,
+    answerText: (row.answer_text as string) ?? undefined,
+    answerChoice: (row.answer_choice as string) ?? undefined,
   };
 }

@@ -1,7 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ProfileBackend } from '../types';
-import { profileToRow, rowToAvailability, rowToInterest, rowToPreferences, rowToProfile } from './mappers';
+import {
+  profileToRow,
+  rowToAvailability,
+  rowToInterest,
+  rowToPreferences,
+  rowToProfile,
+  rowToProfileAnswer,
+} from './mappers';
 
 export function createSupabaseProfileBackend(client: SupabaseClient): ProfileBackend {
   return {
@@ -71,6 +78,31 @@ export function createSupabaseProfileBackend(client: SupabaseClient): ProfileBac
       const { data, error } = await client.from('interests').select('*').order('category');
       if (error) throw error;
       return (data ?? []).map(rowToInterest);
+    },
+
+    async listMyAvailability(userId) {
+      const { data, error } = await client.from('availability_slots').select('*').eq('profile_id', userId);
+      if (error) throw error;
+      return (data ?? []).map(rowToAvailability);
+    },
+
+    async listMyInterestKeys(userId) {
+      const { data, error } = await client
+        .from('profile_interests')
+        .select('interests(key)')
+        .eq('profile_id', userId);
+      if (error) throw error;
+      return (data ?? [])
+        .map((row: { interests: { key: string } | { key: string }[] | null }) =>
+          Array.isArray(row.interests) ? row.interests[0]?.key : row.interests?.key,
+        )
+        .filter((key): key is string => !!key);
+    },
+
+    async listMyAnswers(userId) {
+      const { data, error } = await client.from('profile_answers').select('*').eq('profile_id', userId);
+      if (error) throw error;
+      return (data ?? []).map(rowToProfileAnswer);
     },
   };
 }

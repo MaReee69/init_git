@@ -1,9 +1,13 @@
+import type { ScoredCandidate } from '@/lib/matching/types';
 import type {
   AuthSession,
   AvailabilitySlot,
   DatingPreferences,
   Interest,
+  Match,
   Profile,
+  ProfileAnswer,
+  RecommendationEventType,
 } from '@/types/domain';
 
 /**
@@ -27,9 +31,48 @@ export interface ProfileBackend {
   replaceMyAvailability(userId: string, slots: Pick<AvailabilitySlot, 'weekday' | 'timeBand'>[]): Promise<AvailabilitySlot[]>;
   replaceMyInterests(userId: string, interestKeys: string[]): Promise<void>;
   listInterests(): Promise<Interest[]>;
+  listMyAvailability(userId: string): Promise<AvailabilitySlot[]>;
+  listMyInterestKeys(userId: string): Promise<string[]>;
+  listMyAnswers(userId: string): Promise<ProfileAnswer[]>;
+}
+
+export interface LikeResult {
+  matched: boolean;
+  match?: Match;
+}
+
+export interface MatchWithCounterpart {
+  match: Match;
+  counterpart: Profile;
+}
+
+/**
+ * 候補一覧UI用に、スコア計算結果(ScoredCandidate)へ表示専用フィールドを付加したもの。
+ * displayName/bioは本人が明示入力したプロフィール文であり、スコア計算(src/lib/matching)には使わない。
+ */
+export interface CandidateListItem extends ScoredCandidate {
+  displayName: string;
+  bio?: string;
+}
+
+export interface MatchingBackend {
+  /** ハード条件で絞り込み、説明可能なスコアで並べた候補一覧を返す */
+  listCandidates(viewerId: string): Promise<CandidateListItem[]>;
+  /** いいねを送る。相思相愛ならマッチを作成して返す */
+  likeProfile(viewerId: string, candidateProfileId: string): Promise<LikeResult>;
+  /** 見送り。以後この候補は再提示しない */
+  passProfile(viewerId: string, candidateProfileId: string): Promise<void>;
+  listMyMatches(viewerId: string): Promise<MatchWithCounterpart[]>;
+  recordEvent(
+    viewerId: string,
+    eventType: RecommendationEventType,
+    candidateProfileId?: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<void>;
 }
 
 export interface Backend {
   auth: AuthBackend;
   profiles: ProfileBackend;
+  matching: MatchingBackend;
 }

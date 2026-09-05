@@ -56,5 +56,21 @@
 - [x] 全テーブルにRLSを有効化するmigrationを作成
 - [x] 位置情報カラムを緯度経度でなく文字列エリアで設計
 - [x] 音声保持ポリシー（`retain_until`）をスキーマに反映
-- [ ] RLSの実効性を自動テストで検証（Phase2以降）
-- [ ] レート制限・モデレーションの実プロバイダ接続（Phase2以降）
+- [x] RLSの実効性を自動テストで検証（Phase2で実施。詳細は12章参照）
+- [ ] レート制限・モデレーションの実プロバイダ接続（Phase3以降）
+
+## 12. Phase2: RLSの自動検証（実施済み）
+
+実Supabaseプロジェクトが無い環境でも、ローカルのPostgreSQLに `auth.uid()`/`auth.role()` をSupabaseのGoTrueと同一仕様でスタブ実装し、実際のRow Level Securityを検証できるようにした（`supabase/tests/_local_test_setup.sql`, `supabase/tests/rls_test.sql`, `scripts/run-rls-tests.sh`）。
+
+検証項目（2026-09-05時点で19件全てPASS）:
+- マッチ前は他人のprofilesを直接SELECTできない／UPDATEしても実際には反映されない
+- `get_candidate_pool()`（候補抽出RPC）が年齢・性別・距離のハード条件を正しく適用する
+- ブロックすると双方向に候補・可視性から除外される
+- 受信したいいね（likes）は相互マッチ前は非公開
+- `matches`テーブルへの直接INSERTは拒否され、`finalize_match()`（相互いいね確認RPC）経由でのみマッチが作成される
+- `recommendation_events`は本人分のみINSERTでき、他人になりすませない
+- `moderation_actions`は一般ユーザーから常に不可視（ポリシー未定義=デフォルト拒否）
+- 未認証(anon)は`profiles`を一切参照できない
+
+実装したRLSポリシー自体は全項目で意図通りに機能した（テスト作成時に発覚したのは、テスト側の前提の誤り2件——(1) RLSでUPDATE対象外の行は0件更新になるだけでエラーにはならないため「エラーになること」を期待するのは誤り、(2) 未認証状態のJWTクレームを空文字列に設定するとJSON解析エラーになるため、auth.uid()/auth.role()のスタブ実装側でnullif等による防御が必要——であり、いずれもテストコード側を修正した。候補抽出とマッチ成立はSECURITY DEFINER関数（RPC）に閉じ込め、`matches`テーブルへの直接INSERT権限をクライアントへ与えない設計とした。

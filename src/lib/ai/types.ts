@@ -1,4 +1,5 @@
 import type { VoiceExtractedProfile } from '@/schemas/profile';
+import type { SearchCriteria } from '@/schemas/searchCriteria';
 
 export interface ConversationTurn {
   role: 'user' | 'assistant';
@@ -21,11 +22,27 @@ export interface ProfileExtractionResult {
   followUpQuestion?: string;
 }
 
+export interface SearchCriteriaExtractionResult {
+  criteria: SearchCriteria;
+  /** 条件が曖昧な場合だけ、AIが一度に1問だけ聞き返す */
+  followUpQuestion?: string;
+}
+
+export type VoiceCommandIntent =
+  | 'more_detail'
+  | 'next'
+  | 'like'
+  | 'change_criteria'
+  | 'end_session'
+  | 'unknown';
+
 export interface LlmAdapter {
   extractProfileFromTranscript(input: {
     transcript: string;
     history: ConversationTurn[];
   }): Promise<ProfileExtractionResult>;
+  extractSearchCriteria(input: { transcript: string; history: ConversationTurn[] }): Promise<SearchCriteriaExtractionResult>;
+  classifyVoiceCommand(transcript: string): Promise<VoiceCommandIntent>;
 }
 
 export interface SpeechSynthesisResult {

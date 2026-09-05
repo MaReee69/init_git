@@ -18,16 +18,23 @@
 - [x] README（セットアップ・起動・テスト手順）
 - [x] 型チェック・lint・テスト・起動確認の実施と報告
 
-## Phase 2（次回指示後に着手）
-- [ ] マッチングエンジン: ハード条件（年齢範囲・対象性別・恋愛目的・距離・ブロック状態）による候補絞込
-- [ ] 特徴量計算（reciprocal_fit, values, intent, availability, location, interests, communication_style）の純粋関数実装
-- [ ] 初期重み（reciprocal_fit .20 / values .20 / intent .15 / availability .20 / location .10 / interests .10 / communication_style .05）を設定ファイル/DBで変更可能にする
-- [ ] 推薦カード・詳細画面・いいね・見送り・相互マッチ
-- [ ] 音声マッチコンシェルジュ: 自然言語→構造化条件（hard_filters/soft_preferences/intent/availability/area/budget/date_style）抽出、条件チップ表示・確認
-- [ ] 音声コマンド（詳しく/次/いいね/条件変更 等）と重要操作の確認フロー
-- [ ] STT/LLM/TTS server-only adapter + mockプロバイダ整備（interfaceはPhase1で用意済み、実装拡充）
-- [ ] スコア計算の単体テスト（境界値、音声誤認識、除外条件）
-- [ ] RLSを含む権限テスト
+## Phase 2（完了）
+- [x] マッチングエンジン: ハード条件（年齢範囲・対象性別・恋愛目的・距離・ブロック状態）による候補絞込
+- [x] 特徴量計算（reciprocal_fit, values, intent, availability, location, interests, communication_style）の純粋関数実装
+- [x] 初期重み（reciprocal_fit .20 / values .20 / intent .15 / availability .20 / location .10 / interests .10 / communication_style .05）を設定ファイルで変更可能にする（`src/lib/matching/weights.ts`。DB化は将来拡張として設計上は差し替え容易）
+- [x] 推薦カード・詳細画面・いいね・見送り・相互マッチ
+- [x] 音声マッチコンシェルジュ: 自然言語→構造化条件（hard_filters/soft_preferences/intent/budget/date_style）抽出、条件チップ表示・確認
+- [x] 音声コマンド（詳しく/次/いいね/条件変更/終わる）と重要操作（いいね送信・条件の大幅な緩和）の確認フロー
+- [x] STT/LLM/TTS server-only adapter + mockプロバイダ整備（`extractSearchCriteria`/`classifyVoiceCommand`を追加）
+- [x] スコア計算・ハード条件・検索条件適用の単体テスト（境界値、音声誤認識、除外条件） — 93テスト
+- [x] RLSを含む権限テスト（ローカルPostgreSQLで実RLSを検証、`scripts/run-rls-tests.sh` で19件全てPASS）
+
+残課題（Phase3以降）:
+- 音声波形は簡易アニメーション（実振幅解析ではない）
+- TTSは文字起こしテキストの返却のみで実音声再生は未実装
+- エリアのゆるい一致判定（`areaLooselyMatches`）は簡易的な同義語辞書ベースで、本格的な地理正規化ではない
+- 価値観質問（values特徴量）は`profile_answers`テーブル・スコアリングロジックとも実装済みだが、回答入力UIは未実装のため実運用では常に中立スコアになる
+- Supabase実装（RPC・RLS）はローカルPostgreSQLでの検証のみ。実Supabaseプロジェクトでの動作確認は未実施
 
 ## Phase 3（Phase2完了後）
 - [ ] マッチ後リアルタイムチャット（Supabase Realtime）、既読状態

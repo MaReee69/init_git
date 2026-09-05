@@ -69,3 +69,43 @@ export interface AuthSession {
   userId: string;
   email: string;
 }
+
+export interface Like {
+  id: string;
+  fromProfileId: string;
+  toProfileId: string;
+  createdAt: string;
+}
+
+export interface Match {
+  id: string;
+  profileIdA: string;
+  profileIdB: string;
+  matchedAt: string;
+  status: 'active' | 'unmatched';
+}
+
+export type RecommendationEventType =
+  | 'recommendation_impression'
+  | 'profile_opened'
+  | 'like_sent'
+  | 'pass'
+  | 'match_created'
+  | 'first_message_sent'
+  | 'reply_received'
+  | 'date_proposal_created'
+  | 'date_proposal_accepted'
+  | 'date_proposal_declined'
+  | 'date_completed'
+  | 'unmatch'
+  | 'block'
+  | 'report';
+
+export interface RecommendationEvent {
+  id: string;
+  profileId: string;
+  candidateProfileId?: string;
+  eventType: RecommendationEventType;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}

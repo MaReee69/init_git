@@ -26,7 +26,7 @@
 | status | text default 'active' | active/deactivated/deleted |
 | created_at / updated_at | timestamptz | |
 
-RLS方針: 本人は自分の行をSELECT/UPDATE可。他人の行は「相互マッチ済み」または「推薦候補として提示された、ブロックされていない」場合のみ、後述の**限定ビュー**（`public_profile_view`、位置情報等の機微カラムを除外）経由でのみ参照可能にする。直接 `profiles` テーブルへの他人からのSELECTは許可しない。
+RLS方針: 本人は自分の行をSELECT/UPDATE可。他人の行は「相互マッチ済み」の場合のみ直接SELECT可能（`profiles_select_matched`ポリシー）。マッチ前の推薦候補は`profiles`テーブルへの直接SELECTを許可せず、代わりにSECURITY DEFINER関数 `get_candidate_pool()`（auth.uid()を基準にハード条件を満たす候補のみ、スコアリングに必要な列だけを返す）経由で取得する（Phase2実装、`supabase/migrations/20260905000001_matching_rpc.sql`）。
 
 ## 2. dating_preferences
 恋愛目的・希望相手条件（1ユーザー1行）。
@@ -62,7 +62,7 @@ RLS方針: 本人のみCRUD。相手への開示は推薦理由生成時にサ�
 **interests**: `id uuid PK`, `key text unique`, `label_ja text`, `category text null`
 **profile_interests**: `profile_id uuid FK`, `interest_id uuid FK`, PK(profile_id, interest_id)
 
-RLS方針: `interests` は認証済みユーザー全員がSELECT可（マスタデータ）。`profile_interests` は本人のみCRUD、他人からは限定ビュー経由。
+RLS方針: `interests` は認証済みユーザー全員がSELECT可（マスタデータ）。`profile_interests` は本人のみCRUD。マッチ前の候補者の興味は`get_candidate_pool()`が集約して返す（直接テーブルへの他人アクセスは許可しない）。マッチ後はPhase3で候補一覧と同等の参照手段を追加予定。
 
 ## 5. availability_slots
 会いやすい曜日・時間帯。
@@ -88,7 +88,7 @@ RLS方針: 本人のみCRUD。
 | moderation_status | text default 'pending' | pending/approved/rejected |
 | created_at | timestamptz | |
 
-RLS方針: 本人のみCRUD。承認済み写真のみ、マッチ/推薦相手に限定ビュー経由で公開。
+RLS方針: 本人のみCRUD。写真アップロード自体は未実装（Phase3以降）で、実装時はマッチ済み相手に限定した参照ポリシーまたはRPC経由での公開を検討する。
 
 ## 7. likes
 | カラム | 型 | 説明 |
@@ -113,7 +113,7 @@ RLS方針: 本人が送信したlikeのみSELECT/INSERT可。受信したlike一
 | unmatched_by | uuid null | |
 | unmatched_at | timestamptz null | |
 
-RLS方針: `profile_id_a` または `profile_id_b` が自分の場合のみSELECT可。UPDATE(unmatch)は当事者のみ。
+RLS方針: `profile_id_a` または `profile_id_b` が自分の場合のみSELECT可。UPDATE(unmatch)は当事者のみ。クライアントからの直接INSERTは許可せず、相互いいねが揃った場合のみSECURITY DEFINER関数 `finalize_match()` が作成する（Phase2実装）。
 
 ## 9. messages
 | カラム | 型 | 説明 |

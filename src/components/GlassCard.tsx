@@ -24,7 +24,8 @@ export function GlassCard({ style, intensity = 40, glowColor = 'none', children,
         {
           borderRadius: theme.radii.md,
           borderColor: theme.colors.border,
-          backgroundColor: Platform.OS === 'web' ? theme.colors.bgSurface : 'transparent',
+          // Webはネイティブのぼかし(BlurView)が使えないため、可読性を優先し不透明に近いフォールバック色にする
+          backgroundColor: Platform.OS === 'web' ? `${theme.colors.bgElevated}E6` : 'transparent',
         },
         glowStyle,
         style,

@@ -70,4 +70,19 @@ export const mockProfileBackend: ProfileBackend = {
     const db = await readDb();
     return db.interests;
   },
+
+  async listMyAvailability(userId) {
+    const db = await readDb();
+    return db.availability[userId] ?? [];
+  },
+
+  async listMyInterestKeys(userId) {
+    const db = await readDb();
+    return db.profileInterests[userId] ?? [];
+  },
+
+  async listMyAnswers(userId) {
+    const db = await readDb();
+    return db.profileAnswers[userId] ?? [];
+  },
 };

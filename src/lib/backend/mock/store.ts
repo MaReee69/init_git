@@ -1,8 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { AuthSession, AvailabilitySlot, DatingPreferences, Interest, Profile } from '@/types/domain';
+import type {
+  AuthSession,
+  AvailabilitySlot,
+  DatingPreferences,
+  Interest,
+  Like,
+  Match,
+  Profile,
+  ProfileAnswer,
+  RecommendationEvent,
+} from '@/types/domain';
 
-const STORAGE_KEY = 'skimatch_mock_db_v1';
+const STORAGE_KEY = 'skimatch_mock_db_v2';
 
 export interface MockDb {
   session: AuthSession | null;
@@ -11,7 +21,12 @@ export interface MockDb {
   preferences: Record<string, DatingPreferences>;
   availability: Record<string, AvailabilitySlot[]>;
   profileInterests: Record<string, string[]>;
+  profileAnswers: Record<string, ProfileAnswer[]>;
   interests: Interest[];
+  likes: Like[];
+  matches: Match[];
+  recommendationEvents: RecommendationEvent[];
+  blocks: { blockerId: string; blockedId: string }[];
 }
 
 export const DEFAULT_INTERESTS: Interest[] = [
@@ -37,7 +52,12 @@ function emptyDb(): MockDb {
     preferences: {},
     availability: {},
     profileInterests: {},
+    profileAnswers: {},
     interests: DEFAULT_INTERESTS,
+    likes: [],
+    matches: [],
+    recommendationEvents: [],
+    blocks: [],
   };
 }
 
