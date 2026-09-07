@@ -128,7 +128,7 @@ RLS方針: `profile_id_a` または `profile_id_b` が自分の場合のみSELEC
 | read_at | timestamptz null | |
 | created_at | timestamptz | |
 
-RLS方針: 対応する `matches` の当事者のみSELECT/INSERT。UPDATE(既読)は受信者のみ。ブロック関係がある場合はアプリ層+RLSの両方で不可視化。
+RLS方針: `is_active_match_participant()`（statusがactiveなmatchの当事者のみ真）を用いてSELECT/INSERT/UPDATEを制御する。マッチ解除・ブロック後は即座にRLSレベルで不可視・送信不可になる（アプリ層の一覧非表示だけに頼らない、Phase3実装・RLSテストで検証済み）。UPDATE(既読)は当事者であれば可能（実装は自分宛メッセージのみ更新するようクライアント側で絞り込む）。
 
 ## 10. voice_sessions / voice_turns / voice_assets
 音声コンシェルジュ・音声メッセージ共通の会話/音声基盤。
@@ -137,7 +137,7 @@ RLS方針: 対応する `matches` の当事者のみSELECT/INSERT。UPDATE(既�
 **voice_turns**: `id uuid PK`, `session_id uuid FK`, `role text`(user/assistant), `transcript text null`, `confidence numeric null`, `created_at`
 **voice_assets**: `id uuid PK`, `owner_profile_id uuid FK`, `storage_path text null`, `purpose text`(profile_answer/message/onboarding), `retain_until timestamptz null`, `deleted_at timestamptz null`, `created_at`
 
-RLS方針: いずれも所有者(`profile_id`/`owner_profile_id`)のみCRUD。生音声は文字起こし完了後に削除ジョブ対象（`retain_until` がnullなら即時削除対象、値があれば期限までのみ保持）。音声メッセージとして送信されたvoice_assetは、送信先のmatch当事者にも期限付き署名URLで限定公開する例外を設ける（Phase3で実装、Phase1ではテーブルのみ）。
+RLS方針: いずれも所有者(`profile_id`/`owner_profile_id`)のみCRUD。生音声は文字起こし完了後に削除ジョブ対象（`retain_until` がnullなら即時削除対象、値があれば期限までのみ保持）。音声メッセージとして送信されたvoice_assetは、`voice_assets_select_message_recipient`ポリシー（Phase3実装）により、送信先のactiveなmatch当事者もSELECTできる。実ファイル(Storage)への署名付きURL配信はPhase4以降（現状はメタデータのみ）。
 
 ## 11. ai_preference_facts
 AIが会話から抽出した「明示情報」のみを記録（推測情報は保存しない）。
@@ -239,7 +239,7 @@ RLS方針: 本人分のみSELECT可。INSERTはservice role経由（クライア
 | vote | text | want/change/other/skip |
 | created_at | timestamptz | |
 
-RLS方針: 対応するmatchの当事者のみSELECT/INSERT。相手の投票内容は「同じ案に双方が合意したか」の判定結果のみアプリ層で表示し、生の投票理由は本人にのみ表示する運用とする（Phase3で詳細実装）。
+RLS方針: `date_proposals`はactiveなmatch当事者のみSELECT可。クライアントからの直接INSERT/UPDATEは許可せず、`create_second_date_proposals()`（双方の再会意思確認が取れている場合のみ作成可）・`cast_date_proposal_vote()`（投票 + 双方が同一案にwantした時点でstatusをconfirmedへ自動更新）のRPC経由に統一する（Phase3実装）。
 
 ## 18. date_feedback / date_feedback_answers
 初回デート後の非公開アンケート。

@@ -1,9 +1,13 @@
 import { supabase, hasSupabaseCredentials } from '@/lib/supabaseClient';
 
 import { mockAuthBackend } from './mock/mockAuthBackend';
+import { mockChatBackend } from './mock/mockChatBackend';
+import { mockDateBackend } from './mock/mockDateBackend';
 import { mockMatchingBackend } from './mock/mockMatchingBackend';
 import { mockProfileBackend } from './mock/mockProfileBackend';
 import { createSupabaseAuthBackend } from './supabase/supabaseAuthBackend';
+import { createSupabaseChatBackend } from './supabase/supabaseChatBackend';
+import { createSupabaseDateBackend } from './supabase/supabaseDateBackend';
 import { createSupabaseMatchingBackend } from './supabase/supabaseMatchingBackend';
 import { createSupabaseProfileBackend } from './supabase/supabaseProfileBackend';
 import type { Backend } from './types';
@@ -13,12 +17,24 @@ const useMockBackend = process.env.EXPO_PUBLIC_USE_MOCK_BACKEND === 'true' || !h
 
 function createBackend(): Backend {
   if (useMockBackend) {
-    return { auth: mockAuthBackend, profiles: mockProfileBackend, matching: mockMatchingBackend };
+    return {
+      auth: mockAuthBackend,
+      profiles: mockProfileBackend,
+      matching: mockMatchingBackend,
+      chat: mockChatBackend,
+      dates: mockDateBackend,
+    };
   }
   const client = supabase!;
   const profiles = createSupabaseProfileBackend(client);
   const matching = createSupabaseMatchingBackend(client, (userId) => buildViewerCandidateInput(profiles, userId));
-  return { auth: createSupabaseAuthBackend(client), profiles, matching };
+  return {
+    auth: createSupabaseAuthBackend(client),
+    profiles,
+    matching,
+    chat: createSupabaseChatBackend(client),
+    dates: createSupabaseDateBackend(client),
+  };
 }
 
 /**

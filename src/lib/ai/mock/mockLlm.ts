@@ -1,4 +1,6 @@
 import { DEFAULT_INTERESTS } from '@/lib/backend/mock/store';
+import { aiDraftResultSchema, ownWordsCleanupResultSchema, type AiDraftResult, type OwnWordsCleanupResult } from '@/schemas/messaging';
+import { secondDateProposalResultSchema, type SecondDateProposalResult } from '@/schemas/dateFlow';
 import { voiceExtractedProfileSchema, type VoiceExtractedProfile } from '@/schemas/profile';
 import { searchCriteriaSchema, isSearchCriteriaEmpty, type SearchCriteria } from '@/schemas/searchCriteria';
 import type { BudgetRange, RelationshipIntent, TimeBand, Weekday } from '@/types/domain';
@@ -7,6 +9,7 @@ import type {
   LlmAdapter,
   ProfileExtractionResult,
   SearchCriteriaExtractionResult,
+  SecondDateProposalInput,
   VoiceCommandIntent,
 } from '../types';
 
@@ -125,6 +128,85 @@ function classifyVoiceCommandFromText(transcript: string): VoiceCommandIntent {
   return match?.intent ?? 'unknown';
 }
 
+const FILLER_WORDS = ['えーっと', 'えっと', 'あの、', 'あのー', 'まあ', 'なんか', 'ちょっとその'];
+const WEEKDAY_LABEL = ['日', '月', '火', '水', '木', '金', '土'];
+const TIME_BAND_LABEL: Record<TimeBand, string> = { morning: '朝', afternoon: '午後', evening: '夜', night: '深夜' };
+
+/**
+ * 「自分の言葉モード」: 言い淀み等の言葉を取り除き、文末を整える程度に留め、
+ * 意味を書き換えたり本人が言っていないニュアンスを足したりしない。
+ */
+function cleanUpTranscriptText(transcript: string): OwnWordsCleanupResult {
+  let cleaned = transcript.trim();
+  FILLER_WORDS.forEach((filler) => {
+    cleaned = cleaned.split(filler).join('');
+  });
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  if (cleaned.length > 0 && !/[。！？.!?]$/.test(cleaned)) {
+    cleaned += '。';
+  }
+  return { originalText: transcript, cleanedText: cleaned.length > 0 ? cleaned : transcript };
+}
+
+/**
+ * 「AI文案モード」: 伝えたい意図（本人の発話）をもとに、丁寧さの異なる3つの言い回しへ変換する。
+ * 本人が話していない具体的な事実（日時・場所等）を新たに作り出さない。
+ */
+function draftMessagesFromIntent(intent: string): AiDraftResult {
+  const trimmed = intent.trim();
+  if (trimmed.length === 0) {
+    return { drafts: ['（伝えたい内容をもう少し詳しくお話しください）'] };
+  }
+  const drafts = [
+    `${trimmed}と思っています。もしよければ聞かせてください！`,
+    `${trimmed}のですが、いかがでしょうか？`,
+    `${trimmed}です。ご都合の良いときに教えてもらえたら嬉しいです。`,
+  ];
+  return { drafts };
+}
+
+/**
+ * AIセカンドデート提案（モック）。正確な位置・非公開の予定は入力に含まれない前提で、
+ * 共有された空き時間の重なり・大まかなエリア・予算・共有可の一言だけから3案を組み立てる。
+ */
+function generateSecondDateProposalsFromInput(input: SecondDateProposalInput): SecondDateProposalResult {
+  const slot = input.sharedAvailability[0];
+  const dateTimeCandidate = slot ? `${WEEKDAY_LABEL[slot.weekday]}曜${TIME_BAND_LABEL[slot.timeBand]}` : '来週末の午後';
+  const area = input.area ?? 'お互いに移動しやすいエリア';
+  const budget = input.budget ?? 'mid';
+  const noteHint = input.shareableNotes.find((n) => n.trim().length > 0);
+  const reasonSuffix = noteHint ? `お二人が話していた「${noteHint}」を踏まえたご提案です。` : 'お二人の希望を踏まえたご提案です。';
+
+  return {
+    options: [
+      {
+        placeOrFormat: `${area}のカフェでゆっくり話す`,
+        dateTimeCandidate,
+        durationMinutes: 90,
+        budgetRange: budget,
+        reason: `静かに話せる場所を希望されていたため。${reasonSuffix}`,
+        rainAlternative: '駅直結のカフェへ変更',
+      },
+      {
+        placeOrFormat: `${area}の美術館・展示を見て回る`,
+        dateTimeCandidate,
+        durationMinutes: 120,
+        budgetRange: budget,
+        reason: `会話のきっかけが増えやすい体験型のご提案です。${reasonSuffix}`,
+        rainAlternative: '屋内展示のみのコースに変更',
+      },
+      {
+        placeOrFormat: `${area}を軽く散歩してランチ`,
+        dateTimeCandidate,
+        durationMinutes: 100,
+        budgetRange: budget,
+        reason: `気軽に自然な会話が生まれやすい組み合わせです。${reasonSuffix}`,
+        rainAlternative: '屋内のランチのみに短縮',
+      },
+    ],
+  };
+}
+
 export const mockLlm: LlmAdapter = {
   async extractProfileFromTranscript({ transcript }): Promise<ProfileExtractionResult> {
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -148,5 +230,27 @@ export const mockLlm: LlmAdapter = {
   async classifyVoiceCommand(transcript): Promise<VoiceCommandIntent> {
     await new Promise((resolve) => setTimeout(resolve, 150));
     return classifyVoiceCommandFromText(transcript);
+  },
+
+  async cleanUpTranscript({ transcript }): Promise<OwnWordsCleanupResult> {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const draft = cleanUpTranscriptText(transcript);
+    const parsed = ownWordsCleanupResultSchema.safeParse(draft);
+    return parsed.success ? parsed.data : { originalText: transcript, cleanedText: transcript };
+  },
+
+  async draftMessages({ intent }): Promise<AiDraftResult> {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const draft = draftMessagesFromIntent(intent);
+    const parsed = aiDraftResultSchema.safeParse(draft);
+    return parsed.success ? parsed.data : { drafts: ['（文案の生成に失敗しました。ご自身の言葉でお試しください）'] };
+  },
+
+  async generateSecondDateProposals(input): Promise<SecondDateProposalResult> {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    const draft = generateSecondDateProposalsFromInput(input);
+    const parsed = secondDateProposalResultSchema.safeParse(draft);
+    if (parsed.success) return parsed.data;
+    throw new Error('second date proposal validation failed');
   },
 };

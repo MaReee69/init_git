@@ -1,4 +1,17 @@
-import type { AvailabilitySlot, DatingPreferences, Interest, Match, Profile, ProfileAnswer } from '@/types/domain';
+import type {
+  AvailabilitySlot,
+  DateFeedback,
+  DateFeedbackAnswer,
+  DateProposal,
+  DateProposalVote,
+  DatingPreferences,
+  Interest,
+  Match,
+  Message,
+  Profile,
+  ProfileAnswer,
+  VoiceAsset,
+} from '@/types/domain';
 
 // Supabaseの行(snake_case)とドメイン型(camelCase)を変換する。
 
@@ -78,6 +91,8 @@ export function rowToMatch(row: Record<string, unknown>): Match {
     profileIdB: row.profile_id_b as string,
     matchedAt: row.matched_at as string,
     status: (row.status as Match['status']) ?? 'active',
+    unmatchedBy: (row.unmatched_by as string) ?? undefined,
+    unmatchedAt: (row.unmatched_at as string) ?? undefined,
   };
 }
 
@@ -88,5 +103,75 @@ export function rowToProfileAnswer(row: Record<string, unknown>): ProfileAnswer 
     questionKey: row.question_key as string,
     answerText: (row.answer_text as string) ?? undefined,
     answerChoice: (row.answer_choice as string) ?? undefined,
+  };
+}
+
+export function rowToMessage(row: Record<string, unknown>): Message {
+  return {
+    id: row.id as string,
+    matchId: row.match_id as string,
+    senderId: row.sender_id as string,
+    contentType: (row.content_type as Message['contentType']) ?? 'text',
+    body: (row.body as string) ?? undefined,
+    voiceAssetId: (row.voice_asset_id as string) ?? undefined,
+    aiMode: (row.ai_mode as Message['aiMode']) ?? undefined,
+    readAt: (row.read_at as string) ?? undefined,
+    createdAt: row.created_at as string,
+  };
+}
+
+export function rowToVoiceAsset(row: Record<string, unknown>): VoiceAsset {
+  return {
+    id: row.id as string,
+    ownerProfileId: row.owner_profile_id as string,
+    storagePath: (row.storage_path as string) ?? undefined,
+    purpose: row.purpose as VoiceAsset['purpose'],
+    retainUntil: (row.retain_until as string) ?? undefined,
+    deletedAt: (row.deleted_at as string) ?? undefined,
+    createdAt: row.created_at as string,
+  };
+}
+
+export function rowToDateFeedback(row: Record<string, unknown>): DateFeedback {
+  return {
+    id: row.id as string,
+    matchId: row.match_id as string,
+    profileId: row.profile_id as string,
+    wantToMeetAgain: (row.want_to_meet_again as boolean) ?? undefined,
+    submittedAt: (row.submitted_at as string) ?? undefined,
+    createdAt: row.created_at as string,
+  };
+}
+
+export function rowToDateFeedbackAnswer(row: Record<string, unknown>): DateFeedbackAnswer {
+  return {
+    id: row.id as string,
+    feedbackId: row.feedback_id as string,
+    questionKey: row.question_key as string,
+    answerText: (row.answer_text as string) ?? undefined,
+    visibility: row.visibility as DateFeedbackAnswer['visibility'],
+  };
+}
+
+export function rowToDateProposal(row: Record<string, unknown>): DateProposal {
+  return {
+    id: row.id as string,
+    matchId: row.match_id as string,
+    createdBy: row.created_by as DateProposal['createdBy'],
+    options: row.options as DateProposal['options'],
+    status: row.status as DateProposal['status'],
+    confirmedOptionIndex: (row.confirmed_option_index as number) ?? undefined,
+    createdAt: row.created_at as string,
+  };
+}
+
+export function rowToDateProposalVote(row: Record<string, unknown>): DateProposalVote {
+  return {
+    id: row.id as string,
+    proposalId: row.proposal_id as string,
+    profileId: row.profile_id as string,
+    optionIndex: row.option_index as number,
+    vote: row.vote as DateProposalVote['vote'],
+    createdAt: row.created_at as string,
   };
 }

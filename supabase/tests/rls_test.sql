@@ -243,4 +243,189 @@ select test_assert(
   '7-1: 未認証(anon)はprofilesを一切参照できない'
 );
 
+-- ===== Phase3: チャット・デート後アンケート・AIセカンドデート提案 =====
+
+select test_as_admin();
+insert into test_ids (name, id)
+select 'match_ab', id from matches
+where status = 'active'
+  and (
+    (profile_id_a = (select id from test_ids where name = 'alice') and profile_id_b = (select id from test_ids where name = 'bob'))
+    or (profile_id_a = (select id from test_ids where name = 'bob') and profile_id_b = (select id from test_ids where name = 'alice'))
+  )
+on conflict (name) do update set id = excluded.id;
+
+-- ===== 8. messages: activeなマッチの当事者のみ =====
+
+select test_as('alice');
+select test_expect_success(
+  format(
+    'insert into messages (match_id, sender_id, content_type, body) values (%L, %L, %L, %L)',
+    (select id from test_ids where name = 'match_ab'),
+    (select id from test_ids where name = 'alice'),
+    'text',
+    'こんにちは'
+  ),
+  '8-1: マッチ当事者(alice)はメッセージを送信できる'
+);
+
+select test_as('dave');
+select test_assert(
+  (select count(*) from messages where match_id = (select id from test_ids where name = 'match_ab')) = 0,
+  '8-2: マッチ当事者でないdaveはメッセージを一切参照できない'
+);
+select test_expect_error(
+  format(
+    'insert into messages (match_id, sender_id, content_type, body) values (%L, %L, %L, %L)',
+    (select id from test_ids where name = 'match_ab'),
+    (select id from test_ids where name = 'dave'),
+    'text',
+    'なりすまし'
+  ),
+  '8-3: マッチ当事者でないdaveはメッセージを送信できない'
+);
+
+select test_as('bob');
+select test_assert(
+  (select count(*) from messages where match_id = (select id from test_ids where name = 'match_ab')) = 1,
+  '8-4: マッチ相手(bob)は送信されたメッセージを参照できる'
+);
+
+-- ===== 9. date_feedback / check_mutual_reunion_interest =====
+
+select test_as('alice');
+insert into date_feedback (match_id, profile_id, want_to_meet_again, submitted_at)
+values ((select id from test_ids where name = 'match_ab'), (select id from test_ids where name = 'alice'), true, now());
+
+select test_assert(
+  check_mutual_reunion_interest((select id from test_ids where name = 'match_ab')) = false,
+  '9-1: 片方だけが回答した時点ではcheck_mutual_reunion_interestはfalse'
+);
+
+select test_expect_error(
+  format(
+    'select create_second_date_proposals(%L, %L::jsonb)',
+    (select id from test_ids where name = 'match_ab'),
+    '[]'
+  ),
+  '9-2: 双方の再会意思が確認できるまでcreate_second_date_proposalsは拒否される'
+);
+
+select test_as('bob');
+select test_assert(
+  (select count(*) from date_feedback where match_id = (select id from test_ids where name = 'match_ab') and profile_id = (select id from test_ids where name = 'alice')) = 0,
+  '9-3: bobはalice個人の回答(date_feedback)を直接SELECTできない（マッチ相手でも不可）'
+);
+insert into date_feedback (match_id, profile_id, want_to_meet_again, submitted_at)
+values ((select id from test_ids where name = 'match_ab'), (select id from test_ids where name = 'bob'), true, now());
+
+select test_assert(
+  check_mutual_reunion_interest((select id from test_ids where name = 'match_ab')) = true,
+  '9-4: 双方が「また会いたい」に回答すると check_mutual_reunion_interest はtrue'
+);
+
+-- ===== 10. create_second_date_proposals / cast_date_proposal_vote =====
+
+select test_as('alice');
+do $$
+declare
+  v_id uuid;
+  v_options jsonb := '[
+    {"placeOrFormat":"カフェ","dateTimeCandidate":"土曜午後","durationMinutes":90,"budgetRange":"mid","reason":"静か","rainAlternative":"屋内"},
+    {"placeOrFormat":"美術館","dateTimeCandidate":"土曜午後","durationMinutes":120,"budgetRange":"mid","reason":"体験型","rainAlternative":"屋内展示"}
+  ]'::jsonb;
+begin
+  select create_second_date_proposals((select id from test_ids where name = 'match_ab'), v_options) into v_id;
+  insert into test_ids (name, id) values ('proposal1', v_id) on conflict (name) do update set id = excluded.id;
+  perform test_assert(v_id is not null, '10-1: 双方確認済みならcreate_second_date_proposalsが成功する');
+exception when others then
+  perform test_assert(false, '10-1: 双方確認済みならcreate_second_date_proposalsが成功する (想定外のエラー: ' || sqlerrm || ')');
+end $$;
+
+select test_as('dave');
+select test_expect_error(
+  format('select cast_date_proposal_vote(%L, 0, %L)', (select id from test_ids where name = 'proposal1'), 'want'),
+  '10-2: マッチ当事者でないdaveは投票できない'
+);
+
+select test_as('alice');
+do $$
+declare v_confirmed boolean;
+begin
+  select confirmed into v_confirmed from cast_date_proposal_vote((select id from test_ids where name = 'proposal1'), 0, 'want');
+  perform test_assert(v_confirmed = false, '10-3: 片方だけの投票では確定しない');
+end $$;
+
+select test_as('bob');
+do $$
+declare v_confirmed boolean;
+begin
+  select confirmed into v_confirmed from cast_date_proposal_vote((select id from test_ids where name = 'proposal1'), 0, 'want');
+  perform test_assert(v_confirmed = true, '10-4: 双方が同じ案にwantすると自動的に確定する');
+end $$;
+
+select test_as_admin();
+select test_assert(
+  (select status from date_proposals where id = (select id from test_ids where name = 'proposal1')) = 'confirmed',
+  '10-5: date_proposals.status がconfirmedに更新されている'
+);
+
+-- ===== 11. voice_assets: 送信済み音声メッセージは受信者も参照できる =====
+
+select test_as('alice');
+do $$
+declare v_asset_id uuid;
+begin
+  insert into voice_assets (owner_profile_id, purpose) values ((select id from test_ids where name = 'alice'), 'message')
+    returning id into v_asset_id;
+  insert into test_ids (name, id) values ('voice_asset1', v_asset_id) on conflict (name) do update set id = excluded.id;
+  insert into messages (match_id, sender_id, content_type, body, voice_asset_id)
+    values ((select id from test_ids where name = 'match_ab'), (select id from test_ids where name = 'alice'), 'voice', '（文字起こし）', v_asset_id);
+end $$;
+
+select test_as('bob');
+select test_assert(
+  (select count(*) from voice_assets where id = (select id from test_ids where name = 'voice_asset1')) = 1,
+  '11-1: 送信された音声メッセージの受信者(bob)はvoice_assetsを参照できる'
+);
+
+select test_as('dave');
+select test_assert(
+  (select count(*) from voice_assets where id = (select id from test_ids where name = 'voice_asset1')) = 0,
+  '11-2: マッチ当事者でないdaveはvoice_assetsを参照できない'
+);
+
+-- ===== 12. block_profile: 既存マッチの即時解除とチャットの非表示 =====
+
+select test_as('alice');
+select block_profile((select id from test_ids where name = 'bob'));
+
+select test_as_admin();
+select test_assert(
+  (select status from matches where id = (select id from test_ids where name = 'match_ab')) = 'unmatched',
+  '12-1: block_profile実行後、matchesのstatusがunmatchedになる'
+);
+
+select test_as('alice');
+select test_assert(
+  (select count(*) from messages where match_id = (select id from test_ids where name = 'match_ab')) = 0,
+  '12-2: ブロック後はalice自身も含めてメッセージ履歴が見えなくなる'
+);
+select test_expect_error(
+  format(
+    'insert into messages (match_id, sender_id, content_type, body) values (%L, %L, %L, %L)',
+    (select id from test_ids where name = 'match_ab'),
+    (select id from test_ids where name = 'alice'),
+    'text',
+    'ブロック後の送信'
+  ),
+  '12-3: ブロック後は新規メッセージの送信もできない'
+);
+
+select test_as('bob');
+select test_assert(
+  (select count(*) from messages where match_id = (select id from test_ids where name = 'match_ab')) = 0,
+  '12-4: ブロックされた側(bob)からもメッセージが見えなくなる'
+);
+
 reset role;

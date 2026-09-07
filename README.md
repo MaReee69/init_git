@@ -4,7 +4,7 @@
 
 詳細仕様は [`docs/PRD.md`](docs/PRD.md)、設計は [`docs/architecture.md`](docs/architecture.md) / [`docs/data-model.md`](docs/data-model.md) / [`docs/security.md`](docs/security.md)、進捗は [`docs/tasks.md`](docs/tasks.md) を参照してください。
 
-> **現在の状況: Phase 2完了。** 認証・オンボーディング・プロフィール作成に加え、説明可能なマッチングエンジン、音声/タップ両対応の候補紹介・いいね・相互マッチ、音声マッチコンシェルジュ（自然言語→検索条件の構造化）が実装済みです。チャット・デート提案はPhase3以降で実装します。
+> **現在の状況: Phase 3完了。** 認証・オンボーディング・プロフィール作成・マッチングエンジン・音声マッチコンシェルジュに加え、マッチ相手だけが使えるチャット（3つのメッセージ作成モード）、通報・ブロック、デート後アンケート、双方合意時のAIセカンドデート提案までが実装済みです。管理画面・モデレーションキュー・アカウント削除はPhase4以降で実装します。
 
 ## 技術スタック
 Expo (React Native) + TypeScript + Expo Router / Supabase (Auth, Postgres, Storage, Realtime, RLS, pgvector) / TanStack Query / React Hook Form + Zod / Reanimated + Blur + LinearGradient + Haptics / expo-audio。選定理由は [`docs/architecture.md`](docs/architecture.md) を参照。
@@ -49,6 +49,9 @@ npm run android   # Androidエミュレータ
 6. ホーム画面で「押して話す」→ 話し終える、または画面下の入力欄にテキストを入力して「この内容で伝える」を押すと、AIが希望条件（エリア・空き時間・興味・恋愛目的・予算）を抽出してチップ表示します。「この条件で探す」で候補紹介が始まります
 7. 候補紹介中は「もう少し詳しく」「次の人」「この人いいかも」「条件を変えて」「今日は終わる」と話しかけるか、画面下のボタンをタップして操作できます。いいね送信・マッチ成立は必ず確認ダイアログを挟みます
 8. モックモードでマッチを試すには、2つの異なるメールアドレスで別々にプロフィールを作成し（例: alice@example.com / bob@example.com、性別と「出会いたい相手」を相互に一致させる）、双方から相手に「いいね」を送ると相思相愛でマッチが成立します（同一ブラウザのローカルストレージ内で複数アカウントを行き来して試せます）
+9. マッチ後は「一覧（補助）」タブの「チャットを開く」からチャット画面に入れます。メッセージは通常のテキスト送信のほか、「🎙 自分の言葉」ボタンから音声入力→AIによる文章整形→送信前プレビューという3モード（自分の言葉モード/AI文案モード/声のまま送る）を試せます（実機/マイク権限がある環境向け。Webのヘッドレス環境等でマイクが使えない場合は自動的にテキスト入力へ誘導されます）
+10. チャット画面右上の「⋯」から通報・ブロック・マッチ解除ができます。ブロックすると即座にマッチが解除され、双方のチャット・候補一覧から表示されなくなります
+11. 「デート後アンケート」で双方が「また会いたい」を選ぶと、「セカンドデート提案」画面でAIが3案を提示します。3案それぞれに投票でき、双方が同じ案に「行きたい」と投票すると自動的に日程が確定します
 
 ### 型チェック・Lint・テスト
 ```bash
@@ -70,7 +73,7 @@ Service Role Key・AI APIキーはクライアント（Expoアプリ）に一切
 
 ### RLS（Row Level Security）の権限テスト
 
-Supabase CLIを使わず、ローカルのPostgreSQLに対してRLSポリシーを直接検証するテストスクリプトを用意しています（`supabase/tests/`）。auth.uid()/auth.role() をSupabaseのGoTrueと同じ仕様でスタブ実装し、複数ユーザーになりすましながら「他人の非公開データを取得できないこと」「ブロック/マッチ/いいねの可視性」「moderation_actionsが一般ユーザーから不可視であること」などを自動検証します。
+Supabase CLIを使わず、ローカルのPostgreSQLに対してRLSポリシーを直接検証するテストスクリプトを用意しています（`supabase/tests/`）。auth.uid()/auth.role() をSupabaseのGoTrueと同じ仕様でスタブ実装し、複数ユーザーになりすましながら「他人の非公開データを取得できないこと」「ブロック/マッチ/いいねの可視性」「moderation_actionsが一般ユーザーから不可視であること」「チャットはactiveなマッチ当事者のみアクセスできること」「双方の再会意思確認が取れるまでAIセカンドデート提案が作成できないこと」「投票の自動確定」「送信済み音声メッセージの受信者アクセス」「ブロック時の即時非表示」などを自動検証します（現在38項目）。
 
 ```bash
 # 前提: ローカルにPostgreSQL(psql)がインストール・起動していること
@@ -82,29 +85,33 @@ service postgresql start   # 環境に応じて
 
 ## ディレクトリ構成
 ```
-app/                     Expo Router 画面（(auth)/(onboarding)/(tabs)）
+app/                     Expo Router 画面（(auth)/(onboarding)/(tabs)/chat/date-feedback/second-date）
 src/theme/               Warm Futurism デザイントークン
 src/components/          汎用UIコンポーネント
 src/features/orb/        AIオーブ（待機/聞き取り/思考/発見/確認の状態機械）
-src/features/voice/      push-to-talk録音・波形表示
+src/features/voice/      push-to-talk録音・波形表示・録音ファイルの即時削除
 src/features/matching/   推薦カード等マッチングUI
+src/features/chat/       チャットのメッセージ吹き出し・3モード作成パネル
 src/lib/backend/         データアクセス層（Supabase実装 / ローカルモック実装）
-src/lib/ai/              STT/LLM/TTS server-only adapterインターフェース + モック実装
+src/lib/ai/              STT/LLM/TTS server-only adapterインターフェース + モック実装 + 耐障害性ラッパー
 src/lib/matching/        マッチングエンジン（ハード条件・スコアリング・探索枠・検索条件適用の純粋関数）
-src/schemas/             Zodスキーマ（フォーム・AI抽出結果の検証に共用）
-supabase/migrations/     DBスキーマ・RLSポリシー・候補抽出/マッチ成立RPC
+src/lib/voice/           音声データの保持・削除ポリシー（純粋関数）
+src/schemas/             Zodスキーマ（フォーム・AI抽出結果・メッセージ・デート提案の検証に共用）
+supabase/migrations/     DBスキーマ・RLSポリシー・候補抽出/マッチ成立/チャット/デート提案RPC
 supabase/seed.sql        ローカル開発用シードデータ
-supabase/tests/          RLS権限テスト（ローカルPostgreSQL用）
+supabase/tests/          RLS権限テスト（ローカルPostgreSQL用、38項目）
 scripts/run-rls-tests.sh RLSテスト実行スクリプト
 docs/                    PRD・設計・セキュリティ・タスク計画
 ```
 
 ## 既知の制約・残課題（詳細はdocs/tasks.md）
-- チャット、音声メッセージ、デート後アンケート、AIセカンドデート提案は未実装（Phase3以降）
-- 写真アップロード（Supabase Storage連携）は未実装。候補カードは頭文字プレースホルダーで表示
+- 写真・音声メッセージの実ファイルアップロード（Supabase Storage連携）は未実装。候補カードは頭文字プレースホルダー、音声メッセージはメタデータ(voice_assets)と文字起こしのみ扱う
 - 音声波形は実際のマイク振幅ではなく、録音中かどうかに基づく簡易アニメーション
-- STT/LLMはすべてモック実装（キーワードベースの抽出ロジック）。TTSはテキスト返却のみで実音声再生は未実装
+- STT/LLMはすべてモック実装（キーワードベース/テンプレートベースのロジック）。TTSはテキスト返却のみで実音声再生は未実装
+- 音声データの削除ジョブは判定ロジック（純粋関数）のみ実装済み。定期実行（cron/Edge Function）はPhase4以降
 - 「価値観」特徴量は本人回答UIが未実装のため、実運用では常に中立スコアになる
 - エリアのゆるい一致判定は簡易的な同義語辞書ベースで、本格的な地理正規化ではない
+- AIセカンドデート提案の予算・エリアは自分のプロフィール値を近似として使用（真の双方合意値の集約ではない）
+- 管理・モデレーション画面、通報対応フローはPhase4以降
 - RLS・RPCはローカルPostgreSQLで検証済み（上記スクリプト）だが、実Supabaseプロジェクトでの動作確認は未実施
 - 本コンテナ環境にiOS/Androidシミュレータが無いため、実機/シミュレータでの動作確認は各自の開発環境で行ってください（`npm run ios` / `npm run android`）

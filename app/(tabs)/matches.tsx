@@ -96,12 +96,33 @@ export default function MatchesScreen() {
       ) : (
         matches.map(({ match, counterpart }) => (
           <GlassCard key={match.id} style={{ marginBottom: theme.spacing.sm }} glowColor="violet">
-            <Text style={[theme.typography.subtitle, { color: theme.colors.textPrimary }]}>
+            <Text style={[theme.typography.subtitle, { color: theme.colors.textPrimary, marginBottom: theme.spacing.sm }]}>
               {counterpart.displayName}
             </Text>
-            <Text style={[theme.typography.caption, { color: theme.colors.textTertiary, marginTop: theme.spacing.xxs }]}>
-              チャットはPhase3で実装予定です
-            </Text>
+            <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <PrimaryButton
+                  label="チャットを開く"
+                  onPress={() => router.push({ pathname: '/chat/[matchId]', params: { matchId: match.id } })}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <PrimaryButton
+                  label="デート後アンケート"
+                  variant="secondary"
+                  onPress={() =>
+                    router.push({ pathname: '/date-feedback/[matchId]', params: { matchId: match.id } })
+                  }
+                />
+              </View>
+            </View>
+            <View style={{ marginTop: theme.spacing.sm }}>
+              <PrimaryButton
+                label="セカンドデート提案"
+                variant="ghost"
+                onPress={() => router.push({ pathname: '/second-date/[matchId]', params: { matchId: match.id } })}
+              />
+            </View>
           </GlassCard>
         ))
       )}

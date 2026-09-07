@@ -83,6 +83,8 @@ export interface Match {
   profileIdB: string;
   matchedAt: string;
   status: 'active' | 'unmatched';
+  unmatchedBy?: string;
+  unmatchedAt?: string;
 }
 
 export type RecommendationEventType =
@@ -107,5 +109,83 @@ export interface RecommendationEvent {
   candidateProfileId?: string;
   eventType: RecommendationEventType;
   metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export type MessageContentType = 'text' | 'voice';
+export type MessageAiMode = 'own_voice_cleanup' | 'ai_draft' | 'raw_voice_clip';
+
+export interface Message {
+  id: string;
+  matchId: string;
+  senderId: string;
+  contentType: MessageContentType;
+  body?: string;
+  voiceAssetId?: string;
+  aiMode?: MessageAiMode;
+  readAt?: string;
+  createdAt: string;
+}
+
+export type VoiceAssetPurpose = 'profile_answer' | 'message' | 'onboarding';
+
+export interface VoiceAsset {
+  id: string;
+  ownerProfileId: string;
+  storagePath?: string;
+  purpose: VoiceAssetPurpose;
+  retainUntil?: string;
+  deletedAt?: string;
+  createdAt: string;
+}
+
+export interface DateFeedback {
+  id: string;
+  matchId: string;
+  profileId: string;
+  wantToMeetAgain?: boolean;
+  submittedAt?: string;
+  createdAt: string;
+}
+
+export type DateFeedbackVisibility = 'private' | 'shareable' | 'safety';
+
+export interface DateFeedbackAnswer {
+  id: string;
+  feedbackId: string;
+  questionKey: string;
+  answerText?: string;
+  visibility: DateFeedbackVisibility;
+}
+
+export interface DateProposalOption {
+  placeOrFormat: string;
+  dateTimeCandidate: string;
+  durationMinutes: number;
+  budgetRange: BudgetRange;
+  reason: string;
+  rainAlternative: string;
+}
+
+export type DateProposalStatus = 'pending' | 'confirmed' | 'cancelled';
+
+export interface DateProposal {
+  id: string;
+  matchId: string;
+  createdBy: 'ai' | 'user';
+  options: DateProposalOption[];
+  status: DateProposalStatus;
+  confirmedOptionIndex?: number;
+  createdAt: string;
+}
+
+export type DateProposalVoteChoice = 'want' | 'change' | 'other' | 'skip';
+
+export interface DateProposalVote {
+  id: string;
+  proposalId: string;
+  profileId: string;
+  optionIndex: number;
+  vote: DateProposalVoteChoice;
   createdAt: string;
 }

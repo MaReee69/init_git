@@ -1,5 +1,8 @@
+import type { AiDraftResult, OwnWordsCleanupResult } from '@/schemas/messaging';
+import type { SecondDateProposalResult } from '@/schemas/dateFlow';
 import type { VoiceExtractedProfile } from '@/schemas/profile';
 import type { SearchCriteria } from '@/schemas/searchCriteria';
+import type { BudgetRange, TimeBand, Weekday } from '@/types/domain';
 
 export interface ConversationTurn {
   role: 'user' | 'assistant';
@@ -36,6 +39,16 @@ export type VoiceCommandIntent =
   | 'end_session'
   | 'unknown';
 
+export interface SecondDateProposalInput {
+  /** 双方の空き時間の重なりのみ（個人の予定そのものは渡さない） */
+  sharedAvailability: { weekday: Weekday; timeBand: TimeBand }[];
+  /** 大まかなエリアのみ（正確な住所・現在地は扱わない） */
+  area?: string;
+  budget?: BudgetRange;
+  /** visibility='shareable'かつ本人確認済みの回答のみを呼び出し側で抽出して渡す */
+  shareableNotes: string[];
+}
+
 export interface LlmAdapter {
   extractProfileFromTranscript(input: {
     transcript: string;
@@ -43,6 +56,12 @@ export interface LlmAdapter {
   }): Promise<ProfileExtractionResult>;
   extractSearchCriteria(input: { transcript: string; history: ConversationTurn[] }): Promise<SearchCriteriaExtractionResult>;
   classifyVoiceCommand(transcript: string): Promise<VoiceCommandIntent>;
+  /** 「自分の言葉モード」: 発話を意味を変えずに読みやすく整える */
+  cleanUpTranscript(input: { transcript: string }): Promise<OwnWordsCleanupResult>;
+  /** 「AI文案モード」: 伝えたい意図から文案を最大3件作る（自動送信はしない） */
+  draftMessages(input: { intent: string }): Promise<AiDraftResult>;
+  /** 双方の再会意思確認が取れた場合のみ呼び出される想定のAIセカンドデート提案 */
+  generateSecondDateProposals(input: SecondDateProposalInput): Promise<SecondDateProposalResult>;
 }
 
 export interface SpeechSynthesisResult {

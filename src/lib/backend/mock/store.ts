@@ -3,16 +3,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
   AuthSession,
   AvailabilitySlot,
+  DateFeedback,
+  DateFeedbackAnswer,
+  DateProposal,
+  DateProposalVote,
   DatingPreferences,
   Interest,
   Like,
   Match,
+  Message,
   Profile,
   ProfileAnswer,
   RecommendationEvent,
+  VoiceAsset,
 } from '@/types/domain';
 
-const STORAGE_KEY = 'skimatch_mock_db_v2';
+const STORAGE_KEY = 'skimatch_mock_db_v3';
 
 export interface MockDb {
   session: AuthSession | null;
@@ -27,6 +33,13 @@ export interface MockDb {
   matches: Match[];
   recommendationEvents: RecommendationEvent[];
   blocks: { blockerId: string; blockedId: string }[];
+  reports: { id: string; reporterId: string; reportedId: string; matchId?: string; reasonCode: string; detail?: string }[];
+  messages: Message[];
+  voiceAssets: VoiceAsset[];
+  dateFeedback: DateFeedback[];
+  dateFeedbackAnswers: DateFeedbackAnswer[];
+  dateProposals: DateProposal[];
+  dateProposalVotes: DateProposalVote[];
 }
 
 export const DEFAULT_INTERESTS: Interest[] = [
@@ -58,6 +71,13 @@ function emptyDb(): MockDb {
     matches: [],
     recommendationEvents: [],
     blocks: [],
+    reports: [],
+    messages: [],
+    voiceAssets: [],
+    dateFeedback: [],
+    dateFeedbackAnswers: [],
+    dateProposals: [],
+    dateProposalVotes: [],
   };
 }
 
@@ -105,4 +125,8 @@ export async function writeDb(mutator: (db: MockDb) => MockDb): Promise<MockDb> 
 
 export async function resetMockDb(): Promise<void> {
   await persist(emptyDb());
+}
+
+export function randomId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }

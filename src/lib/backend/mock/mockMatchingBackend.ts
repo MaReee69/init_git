@@ -4,11 +4,7 @@ import { DEFAULT_MATCH_WEIGHTS } from '@/lib/matching/weights';
 import type { Like, Match, Profile } from '@/types/domain';
 
 import type { MatchingBackend } from '../types';
-import { readDb, writeDb, type MockDb } from './store';
-
-function randomId(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
+import { randomId, readDb, writeDb, type MockDb } from './store';
 
 function toCandidateInput(db: MockDb, profileId: string): MatchCandidateInput | null {
   const profile = db.profiles[profileId];

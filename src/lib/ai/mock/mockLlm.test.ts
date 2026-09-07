@@ -102,3 +102,50 @@ describe('mockLlm.classifyVoiceCommand', () => {
     expect(await mockLlm.classifyVoiceCommand('えーっと、あの、次の人にしてください')).toBe('next');
   });
 });
+
+describe('mockLlm.cleanUpTranscript', () => {
+  it('フィラーを除去し、意味を変えずに文末を整える', async () => {
+    const result = await mockLlm.cleanUpTranscript({ transcript: 'えーっと、土曜の午後に会いたいです' });
+    expect(result.cleanedText).not.toContain('えーっと');
+    expect(result.cleanedText.endsWith('。')).toBe(true);
+    expect(result.originalText).toBe('えーっと、土曜の午後に会いたいです');
+  });
+
+  it('空文字列でもクラッシュせず原文を保つ', async () => {
+    const result = await mockLlm.cleanUpTranscript({ transcript: '' });
+    expect(result.originalText).toBe('');
+  });
+});
+
+describe('mockLlm.draftMessages', () => {
+  it('意図から最大3件の文案を作る', async () => {
+    const result = await mockLlm.draftMessages({ intent: '週末に会いたい' });
+    expect(result.drafts.length).toBeGreaterThan(0);
+    expect(result.drafts.length).toBeLessThanOrEqual(3);
+  });
+
+  it('空の意図では聞き返し用のプレースホルダーを返す', async () => {
+    const result = await mockLlm.draftMessages({ intent: '' });
+    expect(result.drafts[0]).toContain('もう少し詳しく');
+  });
+});
+
+describe('mockLlm.generateSecondDateProposals', () => {
+  it('必ず3案を返し、雨天代替案を含む', async () => {
+    const result = await mockLlm.generateSecondDateProposals({
+      sharedAvailability: [{ weekday: 6, timeBand: 'afternoon' }],
+      area: '東京都渋谷区',
+      shareableNotes: ['映画の話で盛り上がった'],
+    });
+    expect(result.options).toHaveLength(3);
+    result.options.forEach((opt) => {
+      expect(opt.rainAlternative.length).toBeGreaterThan(0);
+      expect(opt.reason).toContain('映画の話で盛り上がった');
+    });
+  });
+
+  it('共有情報が空でもクラッシュせず一般的な理由文を返す', async () => {
+    const result = await mockLlm.generateSecondDateProposals({ sharedAvailability: [], shareableNotes: [] });
+    expect(result.options).toHaveLength(3);
+  });
+});
